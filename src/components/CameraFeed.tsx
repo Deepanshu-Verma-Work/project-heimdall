@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { AlertTriangle, Loader2, CheckCircle2, WifiOff } from 'lucide-react';
+import { AlertTriangle, Loader2, WifiOff } from 'lucide-react';
 
 interface CameraFeedProps {
     onAnalysisComplete?: (data: any) => void;
@@ -114,7 +114,7 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                         {apiStatus === 'error' && <WifiOff className="w-3 h-3 text-red-500" />}
 
                         <span className={`text-xs font-mono ${apiStatus === 'error' ? 'text-red-400' :
-                                apiStatus === 'analyzing' ? 'text-yellow-400' : 'text-cyan-400'
+                            apiStatus === 'analyzing' ? 'text-yellow-400' : 'text-cyan-400'
                             }`}>
                             {apiStatus === 'idle' && 'READY'}
                             {apiStatus === 'analyzing' && 'ANALYZING...'}
