@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2, CheckCircle2, WifiOff } from 'lucide-react';
 
 interface CameraFeedProps {
     onAnalysisComplete?: (data: any) => void;
@@ -10,9 +10,10 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
     const webcamRef = useRef<Webcam>(null);
     const [violation, setViolation] = useState<boolean | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
+    const [apiStatus, setApiStatus] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     // API Endpoint (Direct Lambda URL for Production)
-    // Note: In a real app, use environment variables (import.meta.env.VITE_API_URL)
     const API_URL = "https://e6hmc62rl6spkf4dzpxe7ifgd40kdpgi.lambda-url.us-east-1.on.aws/";
 
     useEffect(() => {
@@ -27,6 +28,9 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
             const imageSrc = webcamRef.current.getScreenshot();
             if (!imageSrc) return;
 
+            setApiStatus('analyzing');
+            setErrorMessage(null);
+
             try {
                 const response = await fetch(API_URL, {
                     method: "POST",
@@ -34,23 +38,27 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                     body: JSON.stringify({ image: imageSrc }),
                 });
 
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
                 const data = await response.json();
                 console.log("Analysis Result:", data);
 
-                // Update Local State
+                setApiStatus('success');
                 setViolation(data.violation);
 
-                // Notify Parent (Dashboard)
                 if (onAnalysisComplete) {
                     onAnalysisComplete(data);
                 }
 
             } catch (error) {
                 console.error("Analysis Failed:", error);
-                // Only show error if it's not a temporary network blip (optional refinement)
-                // For now, let's log it to the UI so the user knows connectivity is the issue
+                setApiStatus('error');
                 if (error instanceof Error) {
-                    console.warn("Backend connectivity issue:", error.message);
+                    setErrorMessage(error.message);
+                } else {
+                    setErrorMessage("Unknown API Error");
                 }
             }
         }
@@ -80,7 +88,7 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                 />
             )}
 
-            {/* Error Overlay */}
+            {/* Error Overlay (Camera) */}
             {cameraError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 z-50 p-6 text-center">
                     <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
@@ -93,20 +101,37 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                 </div>
             )}
 
-            {/* Overlay UI (Only show if no error) */}
+            {/* Overlay UI (Only show if no camera error) */}
             {!cameraError && (
                 <div className="absolute inset-0 pointer-events-none">
                     {/* Scanning Line Animation */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.8)] animate-scan opacity-50"></div>
 
                     {/* Status Badge */}
-                    <div className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-black/70 backdrop-blur-md rounded-full border border-white/10">
-                        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-xs font-mono text-cyan-400">LIVE FEED • REKOGNITION ACTIVE</span>
+                    <div className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-black/70 backdrop-blur-md rounded-full border border-white/10 transition-all duration-300">
+                        {apiStatus === 'analyzing' && <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />}
+                        {apiStatus === 'success' && <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>}
+                        {apiStatus === 'error' && <WifiOff className="w-3 h-3 text-red-500" />}
+
+                        <span className={`text-xs font-mono ${apiStatus === 'error' ? 'text-red-400' :
+                                apiStatus === 'analyzing' ? 'text-yellow-400' : 'text-cyan-400'
+                            }`}>
+                            {apiStatus === 'idle' && 'READY'}
+                            {apiStatus === 'analyzing' && 'ANALYZING...'}
+                            {apiStatus === 'success' && 'LIVE • REKOGNITION ACTIVE'}
+                            {apiStatus === 'error' && 'CONNECTION ERROR'}
+                        </span>
                     </div>
 
+                    {/* API Error Message Toast */}
+                    {apiStatus === 'error' && errorMessage && (
+                        <div className="absolute top-16 left-4 bg-red-900/90 text-white text-xs p-2 rounded border border-red-500 max-w-xs break-words">
+                            <strong>Backend Error:</strong> {errorMessage}
+                        </div>
+                    )}
+
                     {/* Detection Box */}
-                    {violation !== null && (
+                    {violation !== null && apiStatus === 'success' && (
                         <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 rounded-lg flex flex-col items-center justify-end pb-4 transition-colors duration-300 ${violation ? 'border-red-500 bg-red-500/10' : 'border-green-500 bg-green-500/10'}`}>
                             <div className={`px-3 py-1 rounded text-sm font-bold ${violation ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
                                 {violation ? 'VIOLATION DETECTED' : 'COMPLIANT'}
