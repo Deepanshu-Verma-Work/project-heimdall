@@ -80,6 +80,11 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                     audio={false}
                     ref={webcamRef}
                     screenshotFormat="image/jpeg"
+                    videoConstraints={{
+                        width: 640,
+                        height: 480,
+                        facingMode: "user"
+                    }}
                     className="w-full h-full object-cover"
                     onUserMediaError={(err) => {
                         console.error("Webcam Error:", err);
