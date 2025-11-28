@@ -21,6 +21,36 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
         if (!window.isSecureContext && window.location.hostname !== 'localhost') {
             setCameraError("Camera access requires HTTPS. Please deploy via AWS Amplify or CloudFront.");
         }
+
+        // Initial Backend Health Check
+        const checkBackendHealth = async () => {
+            try {
+                console.log("Pinging backend...");
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "ping" }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Backend Health Check:", data);
+                    // Don't set status to 'success' yet, wait for first analysis
+                } else {
+                    console.error("Backend Health Check Failed:", response.status);
+                    setApiStatus('error');
+                    setErrorMessage(`Backend Unreachable (HTTP ${response.status})`);
+                }
+            } catch (error) {
+                console.error("Backend Health Check Error:", error);
+                setApiStatus('error');
+                if (error instanceof Error) {
+                    setErrorMessage(`Connection Failed: ${error.message}`);
+                }
+            }
+        };
+
+        checkBackendHealth();
     }, []);
 
     const captureAndAnalyze = async () => {

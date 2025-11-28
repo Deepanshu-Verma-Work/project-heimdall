@@ -21,7 +21,29 @@ export const handler = async (event) => {
     }
 
     try {
-        const body = JSON.parse(event.body || '{}');
+        let rawBody = event.body;
+
+        if (event.isBase64Encoded) {
+            rawBody = Buffer.from(event.body, 'base64').toString('utf-8');
+        }
+
+        console.log("Body Type:", typeof rawBody);
+        // console.log("Body Preview:", rawBody ? rawBody.substring(0, 100) : "Empty"); 
+
+        const body = JSON.parse(rawBody || '{}');
+
+        // Health Check / Ping
+        if (body.action === 'ping') {
+            return {
+                statusCode: 200,
+                headers: {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS"
+                },
+                body: JSON.stringify({ message: "Pong", timestamp: new Date().toISOString() })
+            };
+        }
+
         const imageBase64 = body.image;
 
         if (!imageBase64) {
