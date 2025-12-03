@@ -1,24 +1,13 @@
 import { RekognitionClient, DetectProtectiveEquipmentCommand } from "@aws-sdk/client-rekognition";
 import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 
+
+
 const rekognition = new RekognitionClient({ region: "us-east-1" });
 const sns = new SNSClient({ region: "us-east-1" });
 
 export const handler = async (event) => {
     console.log("Received event:", JSON.stringify(event, null, 2));
-
-    // CORS: Handle OPTIONS Preflight Request
-    if (event.requestContext && event.requestContext.http && event.requestContext.http.method === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            },
-            body: JSON.stringify({ message: "CORS OK" })
-        };
-    }
 
     try {
         let rawBody = event.body;
@@ -37,8 +26,7 @@ export const handler = async (event) => {
             return {
                 statusCode: 200,
                 headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, OPTIONS"
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ message: "Pong", timestamp: new Date().toISOString() })
             };
@@ -49,7 +37,7 @@ export const handler = async (event) => {
         if (!imageBase64) {
             return {
                 statusCode: 400,
-                headers: { "Access-Control-Allow-Origin": "*" },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ error: "Missing 'image' in request body" }),
             };
         }
@@ -104,9 +92,7 @@ export const handler = async (event) => {
         return {
             statusCode: 200,
             headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS"
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 violation: violationDetected,
@@ -120,7 +106,7 @@ export const handler = async (event) => {
         console.error("Error:", error);
         return {
             statusCode: 500,
-            headers: { "Access-Control-Allow-Origin": "*" },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ error: "Internal Server Error", details: error.message }),
         };
     }

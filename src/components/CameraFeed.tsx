@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { AlertTriangle, Loader2, WifiOff } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface CameraFeedProps {
     onAnalysisComplete?: (data: any) => void;
@@ -9,49 +10,14 @@ interface CameraFeedProps {
 const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
     const webcamRef = useRef<Webcam>(null);
     const [violation, setViolation] = useState<boolean | null>(null);
+    const [backendMessage, setBackendMessage] = useState<string>('');
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [apiStatus, setApiStatus] = useState<'idle' | 'analyzing' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // API Endpoint (Direct Lambda URL for Production)
-    const API_URL = "https://e6hmc62rl6spkf4dzpxe7ifgd40kdpgi.lambda-url.us-east-1.on.aws/";
-
-    useEffect(() => {
-        // Check for Secure Context (HTTPS)
-        if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-            setCameraError("Camera access requires HTTPS. Please deploy via AWS Amplify or CloudFront.");
-        }
-
-        // Initial Backend Health Check
-        const checkBackendHealth = async () => {
-            try {
-                console.log("Pinging backend...");
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "ping" }),
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log("Backend Health Check:", data);
-                    // Don't set status to 'success' yet, wait for first analysis
-                } else {
-                    console.error("Backend Health Check Failed:", response.status);
-                    setApiStatus('error');
-                    setErrorMessage(`Backend Unreachable (HTTP ${response.status})`);
-                }
-            } catch (error) {
-                console.error("Backend Health Check Error:", error);
-                setApiStatus('error');
-                if (error instanceof Error) {
-                    setErrorMessage(`Connection Failed: ${error.message}`);
-                }
-            }
-        };
-
-        checkBackendHealth();
-    }, []);
+    const { getToken } = useAuth();
+    // 🚀 AWS Production Endpoint
+    const API_URL = `${import.meta.env.VITE_API_URL}/scan`;
 
     const captureAndAnalyze = async () => {
         if (webcamRef.current && !cameraError) {
@@ -62,9 +28,18 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
             setErrorMessage(null);
 
             try {
+                const token = await getToken();
+                const headers: HeadersInit = {
+                    "Content-Type": "application/json"
+                };
+
+                if (token) {
+                    headers["Authorization"] = token;
+                }
+
                 const response = await fetch(API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers,
                     body: JSON.stringify({ image: imageSrc }),
                 });
 
@@ -77,6 +52,7 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
 
                 setApiStatus('success');
                 setViolation(data.violation);
+                setBackendMessage(data.message || '');
 
                 if (onAnalysisComplete) {
                     onAnalysisComplete(data);
@@ -169,7 +145,7 @@ const CameraFeed: React.FC<CameraFeedProps> = ({ onAnalysisComplete }) => {
                     {violation !== null && apiStatus === 'success' && (
                         <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 rounded-lg flex flex-col items-center justify-end pb-4 transition-colors duration-300 ${violation ? 'border-red-500 bg-red-500/10' : 'border-green-500 bg-green-500/10'}`}>
                             <div className={`px-3 py-1 rounded text-sm font-bold ${violation ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
-                                {violation ? 'VIOLATION DETECTED' : 'COMPLIANT'}
+                                {backendMessage || (violation ? 'VIOLATION DETECTED' : 'COMPLIANT')}
                             </div>
                             {violation && <span className="text-xs text-red-200 mt-1">NO HELMET</span>}
                         </div>
